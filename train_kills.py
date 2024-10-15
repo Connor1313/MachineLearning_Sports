@@ -2,50 +2,44 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error
-from sklearn.preprocessing import LabelEncoder
 
-# Reload the CSV file for 'cs_kills_train'
-kills_train = pd.read_csv('cs_kills_train.csv', low_memory=False)
+# Load training and testing datasets
+train_data = pd.read_csv('/data/cs_kills_train.csv')
+test_data = pd.read_csv('/data/cs_kills_test.csv')
 
+# Preprocessing: Drop columns that are not useful for training or have too many missing values
+irrelevant_columns = ['date', 'raw_player_name', 'raw_team_name', 'raw_enemy_team_name', 'modified_ts']
+train_data = train_data.drop(columns=irrelevant_columns)
+test_data = test_data.drop(columns=irrelevant_columns)
 
+# Handle missing values (for simplicity, fill with 0)
+train_data = train_data.fillna(0)
+test_data = test_data.fillna(0)
 
-# Handling missing values: filling NaNs in 'role' and other necessary columns
-kills_train.fillna({'role': 'Unknown'}, inplace=True)
+# Define features and target
+features = [col for col in train_data.columns if col not in ['actual']]
+target = 'actual'
 
-# Encoding categorical features like 'team_name', 'raw_player_name', 'enemy_team_name'
-label_encoder = LabelEncoder()
+X_train = train_data[features]
+y_train = train_data[target]
+X_test = test_data[features]
+y_test = test_data[target]
 
-kills_train['team_name_encoded'] = label_encoder.fit_transform(kills_train['team_name'])
-kills_train['raw_player_name_encoded'] = label_encoder.fit_transform(kills_train['raw_player_name'])
-kills_train['enemy_team_name_encoded'] = label_encoder.fit_transform(kills_train['enemy_team_name'])
-kills_train['role_encoded'] = label_encoder.fit_transform(kills_train['role'])
+# Split training data for validation (optional, can skip if using the whole training set)
+X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.2, random_state=42)
 
-# Selecting features for the model
-features = ['series_win_prob', 'team_name_encoded', 'raw_player_name_encoded', 'enemy_team_name_encoded', 'role_encoded', 'line']
-target = 'actual'  # Actual number of kills
-
-# Splitting the dataset into training and testing sets
-X = kills_train[features]
-y = kills_train[target]
-
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-
-# Handling NaN values by filling with the median
-X_train = X_train.fillna(X_train.median())
-X_test = X_test.fillna(X_test.median())
-
-# Training the RandomForestRegressor model
-model = RandomForestRegressor(random_state=42)
+# Train the model (using Random Forest Regressor as an example)
+model = RandomForestRegressor(n_estimators=100, random_state=42)
 model.fit(X_train, y_train)
 
-# Making predictions and evaluating the model
+# Make predictions on the test set
 y_pred = model.predict(X_test)
+
+# Evaluate the model performance on the test set
 mse = mean_squared_error(y_test, y_pred)
+print(f"Mean Squared Error on Test Set: {mse}")
 
-# Display the Mean Squared Error and a few predictions vs actual values
-mse, y_pred[:5], y_test[:5]
-
-# Display the Mean Squared Error and a few predictions vs actual values
-print(f"Mean Squared Error: {mse}")
-print(f"Predictions: {y_pred[:5]}")
-print(f"Actual values: {y_test[:5].values}")
+# Optionally, evaluate on the validation set as well
+y_val_pred = model.predict(X_val)
+val_mse = mean_squared_error(y_val, y_val_pred)
+print(f"Mean Squared Error on Validation Set: {val_mse}")
